@@ -64,7 +64,7 @@ func (server *Server) Handler(conn net.Conn) {
 	for {
 		select {
 		case <-isLive: // 用户活跃，继续监听客户端发送的信息
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Minute):
 			// 10秒没有收到客户端的消息，认为用户不活跃，关闭连接
 			user.Offline()
 			return // 退出整个Handler

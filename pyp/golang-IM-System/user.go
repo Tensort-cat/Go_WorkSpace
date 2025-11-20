@@ -65,8 +65,7 @@ func (u *User) SendMessage(msg string) {
 // 用户处理消息
 func (u *User) HandleMessage(msg string) {
 	switch {
-	case msg == "who":
-		// 获取当前在线用户列表
+	case msg == "who": // 获取当前在线用户列表
 		u.server.mapLock.Lock()
 		fmt.Println(u.server.OnlineUsers)
 		for _, onlineUser := range u.server.OnlineUsers {
@@ -75,13 +74,13 @@ func (u *User) HandleMessage(msg string) {
 		}
 		u.server.mapLock.Unlock()
 
-	case msg == "myself":
-		// 发送自己的信息
+	case msg == "myself": // 发送自己的信息
 		myselfMsg := fmt.Sprintf("My name is %s", u.Name)
 		u.SendMessage(myselfMsg)
 
 	case strings.HasPrefix(msg, "rename"):
-		newName := strings.Split(msg, " ")[1]
+		msgSplit := strings.Split(msg, " ")
+		newName := getParam(msgSplit, 1)
 		oldName := u.Name
 		// 修改用户名
 		u.server.mapLock.Lock()
@@ -93,7 +92,28 @@ func (u *User) HandleMessage(msg string) {
 		renameMsg := fmt.Sprintf("%s changed name to %s", oldName, newName)
 		u.SendMessage(renameMsg)
 
+	case strings.HasPrefix(msg, "to"): // 私聊，指令格式: to userName msg
+		msgSplit := strings.Split(msg, " ")
+		toName := msgSplit[1]
+		toMsg := u.Name + ": " + getParam(msgSplit, 2)
+		u.server.mapLock.Lock() // 上锁
+		if toUser, ok := u.server.OnlineUsers[toName]; ok {
+			toUser.SendMessage(toMsg) // 将消息发送到目标用户的消息通道中
+		} else { // 目标用户不在线
+			u.SendMessage("User not online")
+		}
+		u.server.mapLock.Unlock() // 解锁
+
 	default: // 默认广播
 		u.server.BroadCast(u, msg)
 	}
+}
+
+func getParam(sp []string, index int) string {
+	var res string
+	spLen := len(sp)
+	for i := index; i < spLen; i++ {
+		res += " " + sp[i]
+	}
+	return res[1:]
 }
