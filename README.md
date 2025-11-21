@@ -13,7 +13,7 @@
 Go_WorkSpace/
 ├── doc/                      # 学习过程中的文档、资料、记录
 ├── go_base/                  # Go 基础语法示例（变量、结构体、方法、并发等）
-├── pyp/
+├── project/
 │   ├── golang-IM-System/     # 实时通讯系统 Demo（入门项目）
 │   └── ...                   # 未来更多项目
 └── ...
@@ -41,7 +41,7 @@ Go_WorkSpace/
 
 非常适合初学者快速回顾或查询示例。
 
-### 3. `pyp/golang-IM-System/`
+### 3. `project/golang-IM-System/`
 
 一个简单的 **即时通讯（IM）系统 Demo**，用于展示 Go 在网络编程与并发场景下的应用。
 该项目是我从基础语法过渡到实际应用的第一个小型练手项目。
