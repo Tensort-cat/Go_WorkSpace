@@ -124,7 +124,7 @@ func (this *User) DoMessage(msg string) {
 }
 
 //监听当前User channel的 方法,一旦有消息，就直接发送给对端客户端
-func (this *User) ListenMessage() {
+func (this *UserListenMessage() {
 	for {
 		msg := <-this.C
 
