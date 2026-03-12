@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -13,6 +11,16 @@ func ihash(key string) int {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
+}
+
+func RandValue(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
 }
 
 type Reply struct {
@@ -47,34 +55,8 @@ func main() {
 
 	fmt.Println(ihash("A") % 10)
 
-	m := make(map[string]string)
-	m["hello"] = "1"
-	m["world"] = "1"
-	m["bitch"] = "1"
-	fmt.Println(m)
-
-	files, err := filepath.Glob(fmt.Sprintf("he*")) // 读取属于该任务的reduce任务文件
-	if err != nil {
-		fmt.Println("err: %v", err)
-	}
-	for _, file := range files {
-		fmt.Println(file)
-	}
-
-	fmt.Println(simplifyFormat("100-250-114514.txt"))
-
-	rep := Reply{}
-	fmt.Println(rep.Success)
-
-	// os.Rename("hello.txt", "fuck.txt")
-	bytes, err := os.ReadFile("hello.txt")
-	if err != nil {
-		fmt.Println("err: %v", err)
-	} else {
-		fmt.Println(string(bytes))
-	}
-
-	fmt.Printf("%v", true)
+	var ver uint64
+	fmt.Println("ver:", ver)
 }
 
 func simplifyFormat(s string) string {

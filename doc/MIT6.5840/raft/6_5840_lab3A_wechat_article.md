@@ -1,0 +1,474 @@
+# MIT 6.5840 Lab 3(Raft) Part A：Leader Election 
+
+---
+
+## 1. Lab3 简介
+
+该实验要求复现经典的分布式共识算法 **Raft** ，它将实验分为了四部分（3A、3B、3C、3D），分别对应 **leader election** 、**Log replication**、**persistence** 和 **log compaction**，且每一个部分都建立在上一个部分的成功实现上，循序渐进。
+
+**Raft** 的设计思路和 **Paxos** 最大的区别之一，就是它刻意把问题拆开，让实现路径更清晰。论文把整个算法拆成了三部分：**leader election**、**log replication** 和 **safety**。对实验来说，这样的拆分也非常友好：先解决“谁是 leader”，后面再解决“leader 如何复制日志”和“为什么这样做是安全的”。
+
+---
+
+## 2. Lab 3A 任务描述
+
+实验说明对 Part 3A 的要求：
+
+- 根据论文的 Figure 2 定义相关结构体
+- 实现 `Make()` ，它用于创建一个新的节点对象
+- 实现 `RequestVote()`，用于发起对自己的投票
+- 实现 `RequestVoteArgs` 和 `RequestVoteReply` 结构体，作为`RequestVote()`的参数
+- 实现空日志版本的 `AppendEntries RPC`，把它当作纯粹的 **heartbeat** 使用即可，暂不考虑日志复制
+- 实现 `ticker()` ，用于检查是否发起领导人选举
+- 确保在没有故障时 **leader** 能稳定存在
+- 确保旧 **leader** 失效后，集群能重新选出新 **leader**
+
+关键限制：
+
+1. **leader** 发送 **heartbeat** 的频率不能超过每秒 10 次
+2. 在多数节点还能通信的前提下，旧 leader 挂掉之后要在 5 秒内选出新 leader
+
+---
+
+## 3. 整体思路
+
+每个节点都维护了一个 `lastHeartbeat`。只要 **follower** 收到来自 **leader** 的 `AppendEntries`，就刷新这个时间；后台 `ticker()` goroutine 会定期检查，如果发现自己长时间没有收到心跳，并且自己不是 **leader**，就调用 `startElection()` 发起选举。
+
+当节点进入 **candidate** 状态后，会做三件事：
+
+1. `currentTerm++`（自增任期号）
+2. 给自己投票
+3. 并发向其他节点发送 `RequestVote`
+
+如果成功拿到半数以上的票，就切换成 **leader** ，并立即先发一轮空的 `AppendEntries` （正常的系统中同一时间只会有一个 **leader**，其他 **candidate** 收到后会自动退回 **follower** 状态），后面再由 `leaderLoop()` 周期性发送 **heartbeat **。
+
+---
+
+## 4. 代码实现拆解
+
+### 4.1 常量与角色定义
+
+定义了三个角色和心跳间隔：
+
+```go
+const (
+    FOLLOWER           = "follower"
+    CANDIDATE          = "candidate"
+    LEADER             = "leader"
+    HEARTBEAT_INTERVAL = 100 * time.Millisecond
+)
+```
+
+这里把 heartbeat interval 设成 `100ms`，正好对应每秒 10 次，满足实验要求的频率限制。
+
+### 4.2 Raft 结构体
+
+`Raft` 结构体里除了 `currentTerm`、`votedFor`、`log`、`commitIndex`、`lastApplied` 这些论文 Figure 2 里的状态，还需维护了两个当前阶段非常关键的字段和实验中要求的 `applyCh` (tester 通过 `applyCh` 接收提交的日志，3A用不到)：
+
+- `role`：表示当前身份是 follower / candidate / leader
+- `lastHeartbeat`：表示最近一次收到 leader 活动信号的时间
+
+此外，还有 `LogEntry` 结构体，表示一条记录:
+
+```go
+// A Go object implementing a single Raft peer.
+type Raft struct {
+	mu        sync.Mutex          // Lock to protect shared access to this peer's state
+	peers     []*labrpc.ClientEnd // RPC end points of all peers
+	persister *tester.Persister   // Object to hold this peer's persisted state
+	me        int                 // this peer's index into peers[]
+	dead      int32               // set by Kill()
+
+	// Your data here (3A, 3B, 3C).
+	// Look at the paper's Figure 2 for a description of what
+	// state a Raft server must maintain.
+
+	// Persistent state on all servers
+	currentTerm int
+	votedFor    int
+	log         []LogEntry
+
+	// Volatile state on all servers
+	commitIndex int
+	lastApplied int
+
+	// Volatile state on leaders
+	nextIndex  []int
+	matchIndex []int
+
+	role string // "follower", "candidate", or "leader"
+
+	lastHeartbeat time.Time // 上次收到心跳的时间
+    
+    applyCh chan raftapi.ApplyMsg // 用于向服务或测试器发送 ApplyMsg 消息的通道 
+}
+
+type LogEntry struct {
+	Command any // command for state machine
+	Term    int // term when entry was received by leader
+}
+```
+
+3A 虽然只需完成领导人选举，但把 `commitIndex`、`nextIndex`、`matchIndex` 这些字段也先放好，不会影响测试。
+
+
+
+### 4.3 Make()
+
+`Make()` 用于创建一个系统中的新节点:
+
+```go
+// the service or tester wants to create a Raft server. the ports
+// of all the Raft servers (including this one) are in peers[]. this
+// server's port is peers[me]. all the servers' peers[] arrays
+// have the same order. persister is a place for this server to
+// save its persistent state, and also initially holds the most
+// recent saved state, if any. applyCh is a channel on which the
+// tester or service expects Raft to send ApplyMsg messages.
+// Make() must return quickly, so it should start goroutines
+// for any long-running work.
+func Make(peers []*labrpc.ClientEnd, me int,
+	persister *tester.Persister, applyCh chan raftapi.ApplyMsg) raftapi.Raft {
+	rf := &Raft{}
+	rf.peers = peers
+	rf.persister = persister
+	rf.me = me
+
+	// Your initialization code here (3A, 3B, 3C).
+	rf.currentTerm = 0
+	rf.votedFor = -1
+	rf.log = []LogEntry{{Term: 0}}
+	rf.commitIndex = 0
+	rf.lastApplied = 0
+	rf.role = FOLLOWER // 一开始都是 FOLLOWER
+
+	// nextIndex 和 matchIndex 在选举后要重新初始化
+	rf.nextIndex = make([]int, len(peers))
+	rf.matchIndex = make([]int, len(peers))
+
+	rf.lastHeartbeat = time.Now() // 初始化上次收到心跳的时间
+
+	// initialize from state persisted before a crash
+	rf.readPersist(persister.ReadRaftState())
+
+	// start ticker goroutine to start elections
+	go rf.ticker()
+
+	return rf
+}
+```
+
+
+
+### 4.4 RequestVote RPC
+
+`RequestVote()` 说白了就是翻译论文的 **Figure 2**：
+
+- 如果请求里的 `term` 比自己旧，直接拒绝投票；
+- 如果请求里的 `term` 不旧于自己，就更新自己的任期并退回 follower （退回是为了防止出现多个 **leader** 的情况）；
+- 如果自己这一轮还没投票，或已经投给同一个 **candidate**，再加上对方日志至少和自己一样新，就授予选票。
+
+我这里顺手把日志新旧比较也提前加了进去：
+
+```go
+// example RequestVote RPC handler.
+func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	// Your code here (3A, 3B).
+	reply.Term = rf.currentTerm
+	reply.VoteGranted = false
+	rf.lastHeartbeat = time.Now() // 更新上次收到心跳的时间
+	if args.Term < rf.currentTerm {
+		return
+	}
+	if args.Term > rf.currentTerm {
+		rf.currentTerm = args.Term
+		rf.votedFor = -1
+		rf.role = FOLLOWER
+	}
+
+	// If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s log, grant vote
+	// 如果 votedFor 是 null 或 candidateId，并且候选人的日志至少和接收者的日志一样新，则投票给候选人
+	lastIndex, lastTerm := rf.lastLogIndexTerm()
+	up2date := args.LastLogTerm > lastTerm || (args.LastLogTerm == lastTerm && args.LastLogIndex >= lastIndex)
+	if (rf.votedFor == -1 || rf.votedFor == args.CandidateId) && up2date {
+		reply.VoteGranted = true
+		rf.votedFor = args.CandidateId
+	}
+
+	reply.Term = rf.currentTerm
+}
+
+func (rf *Raft) lastLogIndexTerm() (int, int) {
+	lastIndex := len(rf.log) - 1
+	if lastIndex < 0 {
+		return -1, 0
+	}
+	return lastIndex, rf.log[lastIndex].Term
+}
+
+type AppendEntriesArgs struct {
+	Term         int        // leader’s term
+	LeaderId     int        // so follower can redirect clients
+	PrevLogIndex int        // index of log entry immediately preceding new ones
+	PrevLogTerm  int        // term of prevLogIndex entry
+	Entries      []LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
+	LeaderCommit int        // leader’s commitIndex
+}
+
+type AppendEntriesReply struct {
+	Term    int  // currentTerm, for leader to update itself
+	Success bool // true if follower contained entry matching prevLogIndex and prevLogTerm
+}
+
+func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}
+```
+
+虽然 3A 还没开始真正复制日志，但这个判断其实已经是论文里的 **election restriction** 了，后面做 3B 不用再回头重写这部分。
+
+### 4.5 AppendEntries RPC
+
+在 3A 里，`AppendEntries` 能够承担心跳的功能即可，所以实现重点是：
+
+- 判断 **term** 是否过期；
+- 更高 **term** 到来时退回 **follower**；
+- **candidate** 收到合法 **leader** 的 `AppendEntries` 后退回 **follower**；
+- 刷新 `lastHeartbeat`，避免错误触发下一轮选举。
+
+```go
+// AppendEntries RPC handler.
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	reply.Success = false
+	reply.Term = rf.currentTerm
+
+	rf.lastHeartbeat = time.Now() // 更新上次收到心跳的时间
+
+	// Reply false if term < currentTerm
+	if args.Term < rf.currentTerm {
+		return
+	}
+
+    // 更高 term 到来时退回 follower
+	if args.Term > rf.currentTerm {
+		rf.currentTerm = args.Term
+		rf.votedFor = -1
+		rf.role = FOLLOWER
+	}
+
+    // candidate 收到合法 leader 的 AppendEntries 后退回 follower
+	if args.Term == rf.currentTerm && rf.role == CANDIDATE {
+		rf.role = FOLLOWER
+		rf.votedFor = -1
+	}
+
+	reply.Term = rf.currentTerm
+}
+
+// example RequestVote RPC arguments structure.
+// field names must start with capital letters!
+type RequestVoteArgs struct {
+	// Your data here (3A, 3B).
+	Term         int // 候选人的任期号
+	CandidateId  int // 请求选票的候选人的 ID
+	LastLogIndex int // 候选人的最后日志条目的索引值
+	LastLogTerm  int // 候选人最后日志条目的任期号
+}
+
+// example RequestVote RPC reply structure.
+// field names must start with capital letters!
+type RequestVoteReply struct {
+	// Your data here (3A).
+	Term        int  // 当前任期号，以便于候选人去更新自己的任期号
+	VoteGranted bool // 候选人赢得了此张选票时为真
+}
+```
+
+### 4.6 ticker()
+
+`ticker()` 是整个 3A 的核心。它不断循环：
+
+- `Sleep(10ms)`
+- 随机生成一个 election timeout
+- 检查自己距离上次收到 heartbeat 是否已经超时
+- 如果超时并且自己不是 **leader**，就发起选举
+
+这部分本质上就是把论文里 **follower** 在 election timeout 内没收到任何通信就变为 **candidate** 的规则翻译成代码:
+
+```go
+func (rf *Raft) ticker() {
+	for rf.killed() == false {
+
+		// Your code here (3A)
+		// Check if a leader election should be started.
+
+		time.Sleep(10 * time.Millisecond)
+		timeout := time.Duration(150+rand.Intn(150)) * time.Millisecond
+
+		rf.mu.Lock()
+		// 如果不是 leader，并且距离上次收到心跳的时间超过了超时时间，则开始选举
+		if rf.role != LEADER && time.Since(rf.lastHeartbeat) >= timeout {
+			rf.mu.Unlock()
+			rf.startElection()
+			continue
+		}
+
+		rf.mu.Unlock()
+	}
+}
+```
+
+### 4.7 startElection()
+
+`startElection()` 相当于 **candidate** 的生命周期，这个角色的存在本身便仅为了选出 **leader**：
+
+```go
+func (rf *Raft) startElection() {
+	rf.mu.Lock()
+	if rf.role == LEADER {
+		rf.mu.Unlock()
+		return
+	}
+
+	rf.role = CANDIDATE // 转变为候选人
+	rf.currentTerm++    // 任期号加一
+	rf.votedFor = rf.me // 给自己投票
+	var votes int32 = 1 // 已经获得的选票数，初始值为 1（自己投的一票）
+	term := rf.currentTerm
+	lastIndex, lastTerm := rf.lastLogIndexTerm()
+	rf.lastHeartbeat = time.Now()
+	rf.mu.Unlock()
+
+	for i := range rf.peers {
+		if i == rf.me {
+			continue
+		}
+
+		go func(server int) {
+			args := RequestVoteArgs{
+				Term:         term,
+				CandidateId:  rf.me,
+				LastLogIndex: lastIndex,
+				LastLogTerm:  lastTerm,
+			}
+			reply := RequestVoteReply{}
+			ok := rf.sendRequestVote(server, &args, &reply)
+			if !ok {
+				return
+			}
+
+			rf.mu.Lock()
+			defer rf.mu.Unlock()
+
+			// 如果回复的任期号比当前任期号大，说明自己过时了，转变为 FOLLOWER
+			if reply.Term > rf.currentTerm {
+				rf.currentTerm = reply.Term
+				rf.role = FOLLOWER
+				rf.votedFor = -1
+				rf.lastHeartbeat = time.Now()
+				return
+			}
+
+			// 因为并发问题当前 rf 可能已经不是 candidate 或者任期号已经改变了，需要检查
+			if rf.role != CANDIDATE || rf.currentTerm != term {
+				return
+			}
+
+			if reply.VoteGranted {
+				newVotes := atomic.AddInt32(&votes, 1) // 必须原子操作，votes 的访问会产生竞争条件
+                if int(newVotes) > len(rf.peers)/2 {
+					rf.role = LEADER
+					rf.lastHeartbeat = time.Now()
+					go rf.leaderLoop() // 开启 leader 的生命周期
+					go rf.sendHeartbeat()
+				}
+			}
+
+		}(i)
+	}
+}
+```
+
+### 4.8 leaderLoop() 与 sendHeartbeat()
+
+leader 一旦产生，就进入 `leaderLoop()`：
+
+```go
+func (rf *Raft) leaderLoop() {
+	for rf.killed() == false {
+		time.Sleep(HEARTBEAT_INTERVAL)
+		rf.mu.Lock()
+		if rf.role != LEADER {
+			rf.mu.Unlock()
+			return
+		}
+		rf.mu.Unlock()
+		rf.sendHeartbeat()
+	}
+}
+```
+
+这部分做的事情很简单：只要自己还是 **leader**，就周期性发 heartbeat。
+
+而 `sendHeartbeat()` 则会并发向其他节点发送空的 `AppendEntries`（ 3B 开始有了日志复制就不是空的了）。如果对端返回了更大的 `term`，说明当前 leader 已经过时，需要立即退回 follower:
+
+```go
+func (rf *Raft) sendHeartbeat() {
+	for i := range rf.peers { // 给自己以外的节点发送心跳
+		if i == rf.me {
+			continue
+		}
+
+		go func(server int) {
+            rf.mu.Lock()
+			term := rf.currentTerm
+			args := AppendEntriesArgs{
+				Term:         term,
+				LeaderId:     rf.me,
+				PrevLogIndex: -1,
+                PrevLogTerm:  0,
+                Entries:      nil,
+				LeaderCommit: rf.commitIndex,
+			}
+			rf.mu.Unlock()
+			reply := AppendEntriesReply{}
+			rf.sendAppendEntries(server, &args, &reply)
+
+			rf.mu.Lock()
+			defer rf.mu.Unlock()
+			if reply.Term > rf.currentTerm {
+				rf.currentTerm = reply.Term
+				rf.role = FOLLOWER
+				rf.votedFor = -1
+				rf.lastHeartbeat = time.Now()
+			}
+		}(i)
+	}
+}
+```
+
+
+
+---
+
+## 5. 容易踩坑的点
+
+### 5.1 刚当选 leader 就要立刻发 heartbeat
+
+“立刻宣布自己是 leader”这件事本身就是选举流程的一部分。论文提到，**candidate** 一旦赢得选举，就应该立刻向其他节点发送 **heartbeat**，以建立 **authority**，并阻止其他 **follower** 再次超时。
+
+### 5.2 处理投票回复时还要再次检查 role 和 term
+
+因为 RPC 回复可能乱序、延迟、重复。你发出 `RequestVote` 的时候是 **candidate**，不代表收到回复的时候还是 **candidate**。这个检查的本质，就是防止旧消息污染当前状态。
+
+---
+
+## 6. 总结与收获
+
+![image-20260306210654950](C:\Users\PYP\AppData\Roaming\Typora\typora-user-images\image-20260306210654950.png)
+通过~受益匪浅，MIT牛逼

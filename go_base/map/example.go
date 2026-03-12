@@ -19,8 +19,8 @@ func main() {
 
 	/*查看元素在集合中是否存在 */
 	name, ok := siteMap["Facebook"] /*如果确定是真实的,则存在,否则不存在 */
-	/*fmt.Println(capital) */
-	/*fmt.Println(ok) */
+	fmt.Println(name)
+	fmt.Println(ok)
 	if ok {
 		fmt.Println("Facebook 的 站点是", name)
 	} else {
