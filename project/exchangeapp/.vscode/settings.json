@@ -1,0 +1,7 @@
+{
+  "go.toolsEnvVars": {
+    "GOCACHE": "D:\\dev_soft\\Go_WorkSpace\\project\\exchangeapp\\backend\\.gocache",
+    "GOTMPDIR": "D:\\dev_soft\\Go_WorkSpace\\project\\exchangeapp\\backend\\.gotmp",
+    "GOFLAGS": "-buildvcs=false"
+  }
+}

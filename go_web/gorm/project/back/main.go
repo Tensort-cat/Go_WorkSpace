@@ -1,83 +1,25 @@
 package main
 
 import (
-	"net/http"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"fmt"
+	"go_web/gorm/project/back/dao"
+	"go_web/gorm/project/back/models"
+	"go_web/gorm/project/back/routes"
 )
 
-type Todo struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at"`
-	Title     string         `json:"title"`
-	Status    bool           `json:"status"`
-}
-
 func main() {
-	r := gin.Default()
-	dsn := "root:123456@tcp(127.0.0.1:3306)/gorm?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	err := dao.InitMysql()
 	if err != nil {
-		panic("连接数据库失败")
+		fmt.Printf("init mysql failed, err:%v\n", err)
+		return
 	}
 
-	// 增加笔记
-	r.POST("/v1/todo", func(ctx *gin.Context) {
-		var todo Todo
-		if err := ctx.ShouldBindJSON(&todo); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "出错"})
-			return
-		}
-		res := db.Create(&todo)
-		if res.Error != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "服务器出错"})
-			return
-		}
-		ctx.JSON(http.StatusOK, "添加成功")
-	})
+	defer dao.Close()
 
-	// 查看笔记
-	r.GET("/v1/todo", func(ctx *gin.Context) {
-		todos := []Todo{}
-		res := db.Find(&todos)
-		if res.Error != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "服务器出错"})
-			return
-		}
-		ctx.JSON(http.StatusOK, &todos)
-	})
+	// 模型绑定
+	dao.DB.AutoMigrate(&models.Todo{})
 
-	// 更新待办事项状态
-	r.PUT("/v1/todo/:id", func(ctx *gin.Context) {
-		id := ctx.Param("id")
-		var todo Todo
-		if err := ctx.ShouldBindJSON(&todo); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "出错"})
-			return
-		}
-		res := db.Model(&Todo{}).Where("id = ?", id).Update("status", todo.Status)
-		if res.Error != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "服务器出错"})
-			return
-		}
-		ctx.JSON(http.StatusOK, "修改成功")
-	})
-
-	// 删除笔记
-	r.DELETE("/v1/todo/:id", func(ctx *gin.Context) {
-		id := ctx.Param("id")
-		res := db.Delete(&Todo{}, id)
-		if res.Error != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "服务器出错"})
-			return
-		}
-		ctx.JSON(http.StatusOK, "删除成功")
-	})
-
+	// 注册路由
+	r := routes.SetRouter()
 	r.Run()
 }
