@@ -32,6 +32,7 @@ func main() {
 	)
 	CheckErrSend(err)
 
+	// 创建一个“向这个 stream 追加消息”的生产者
 	producer, err := env.NewProducer(streamName, stream.NewProducerOptions())
 	CheckErrSend(err)
 

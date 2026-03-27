@@ -25,6 +25,7 @@ func main() {
 			SetPassword("guest"))
 	CheckErrReceive(err)
 
+	// 创建一个名叫 hello-go-stream 的 stream，最大容量为 2GB
 	streamName := "hello-go-stream"
 	err = env.DeclareStream(streamName,
 		&stream.StreamOptions{
@@ -33,13 +34,15 @@ func main() {
 	)
 	CheckErrReceive(err)
 
+	// 定义收到信息后的处理函数
 	messagesHandler := func(consumerContext stream.ConsumerContext, message *amqp.Message) {
 		fmt.Printf("Stream: %s - Received message: %s\n", consumerContext.Consumer.GetStreamName(),
 			message.Data)
 	}
 
+	// 创建消费者
 	consumer, err := env.NewConsumer(streamName, messagesHandler,
-		stream.NewConsumerOptions().SetOffset(stream.OffsetSpecification{}.First()))
+		stream.NewConsumerOptions().SetOffset(stream.OffsetSpecification{}.First())) // 从 stream 的第一条消息开始读
 	CheckErrReceive(err)
 
 	reader := bufio.NewReader(os.Stdin)
