@@ -1,0 +1,5 @@
+{"level":"info","ts":"2026-04-01T17:45:42.136+0800","msg":"test log","user":{"Name":"Kevin"},"func":"main.main","file":"D:/dev_soft/Go_WorkSpace/logger/zap/encapsulation/main.go","line":15}
+{"level":"info","ts":"2026-04-01T19:33:22.171+0800","msg":"test log","user":{"Name":"Kevin"},"func":"main.main","file":"D:/dev_soft/Go_WorkSpace/logger/zap/encapsulation/main.go","line":15}
+{"level":"debug","ts":"2026-04-01T19:33:22.176+0800","msg":"test log","user":{"Name":"Kevin"},"func":"main.main","file":"D:/dev_soft/Go_WorkSpace/logger/zap/encapsulation/main.go","line":16}
+{"level":"warn","ts":"2026-04-01T19:33:22.176+0800","msg":"test log","user":{"Name":"Kevin"},"func":"main.main","file":"D:/dev_soft/Go_WorkSpace/logger/zap/encapsulation/main.go","line":17}
+{"level":"error","ts":"2026-04-01T19:33:22.176+0800","msg":"test log","user":{"Name":"Kevin"},"func":"main.main","file":"D:/dev_soft/Go_WorkSpace/logger/zap/encapsulation/main.go","line":18}
