@@ -1,0 +1,37 @@
+[mainConfig]
+appName = "YukoChat"
+host = "localhost"
+port = 8000
+
+[mysqlConfig]
+host = "localhost"
+port = 3306
+user = "root"
+password = "123456"
+database = "yuko_chat"
+
+[redisConfig]
+host = "localhost"
+port = 6379
+password = "123456"
+db = 0
+
+[logConfig]
+logPath = "./logs/app.log"
+
+[kafkaConfig]
+hostPort = "localhost:9092"
+topic = "yuko_chat_messages"
+partition = 0
+timeout = 10 # 单位秒
+
+[staticSrcConfig]
+staticAvatarPath = "./static/avatars" # 存储用户头像的路径
+staticFilePath = "./static/files" # 存储用户文件的路径
+
+[emailConfig] # 用于发送验证码
+host = "smtp.qq.com"
+port = 465
+username = "1030693032@qq.com"
+password = "swobdqinvydebeba"
+from = "1030693032@qq.com"
