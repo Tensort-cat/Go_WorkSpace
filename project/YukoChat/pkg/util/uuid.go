@@ -63,6 +63,6 @@ func currentMillis() int64 {
 	return time.Now().UnixMilli()
 }
 
-func GenUserUUID() string {
-	return fmt.Sprintf("U%019d", userUUIDGenerator.nextID())
+func GenUUID(prefix string) string {
+	return prefix + fmt.Sprintf("%019d", userUUIDGenerator.nextID())
 }

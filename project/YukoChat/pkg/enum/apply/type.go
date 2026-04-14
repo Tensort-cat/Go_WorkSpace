@@ -1,4 +1,4 @@
-package contact_enum
+package apply_enum
 
 const (
 	USER = iota

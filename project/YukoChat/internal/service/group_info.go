@@ -2,12 +2,17 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
+	"slices"
 	"time"
 	"yuko_chat/internal/dao"
 	"yuko_chat/internal/dto/request"
 	"yuko_chat/internal/dto/respond"
 	"yuko_chat/internal/model"
 	"yuko_chat/pkg/constant"
+	contact_enum "yuko_chat/pkg/enum/contact"
+	group_enum "yuko_chat/pkg/enum/group"
+	"yuko_chat/pkg/util"
 	"yuko_chat/pkg/zlog"
 
 	"go.uber.org/zap/zapcore"
@@ -21,6 +26,7 @@ var GroupInfoService = new(groupInfoService)
 
 func (s *groupInfoService) CreateGroup(req request.CreateGroupRequest) (string, int) {
 	group := model.GroupInfo{
+		Uuid:      util.GenUUID("G"),
 		OwnerId:   req.OwnerId,
 		Name:      req.Name,
 		Notice:    req.Notice,
@@ -37,8 +43,9 @@ func (s *groupInfoService) CreateGroup(req request.CreateGroupRequest) (string, 
 	contact := model.UserContact{
 		UserId:      req.OwnerId,
 		ContactId:   group.Uuid,
-		ContactType: model.ContactTypeGroup, // 群聊
-		Status:      model.StatusNormal,
+		ContactType: contact_enum.GROUP, // 群聊
+		Status:      contact_enum.NORMAL,
+		UpdateAt:    time.Now(),
 		CreatedAt:   time.Now(),
 	}
 	err = dao.DB.Create(&contact).Error
@@ -46,7 +53,7 @@ func (s *groupInfoService) CreateGroup(req request.CreateGroupRequest) (string, 
 	return "群聊创建成功", 0
 }
 
-func (s *groupInfoService) GetMyGroups(req request.GetMyGroupsRequest) (string, int, []model.GroupInfo) {
+func (s *groupInfoService) GetMyGroups(req request.OwnlistRequest) (string, int, []model.GroupInfo) {
 	var groups []model.GroupInfo
 	err := dao.DB.Where("owner_id = ?", req.OwnerId).Find(&groups).Error
 	if err != nil {
@@ -84,10 +91,8 @@ func (s *groupInfoService) EnterGroupDirectly(req request.EnterGroupDirectlyRequ
 	}
 
 	// 检查用户是否已经在群里了
-	for _, member := range members {
-		if member == req.ContactId {
-			return "你已经在群里了", -2
-		}
+	if slices.Contains(members, req.ContactId) {
+		return "你已经在群里了", -2
 	}
 
 	// 将用户加入群成员列表
@@ -112,8 +117,9 @@ func (s *groupInfoService) EnterGroupDirectly(req request.EnterGroupDirectlyRequ
 	contact := model.UserContact{
 		UserId:      req.ContactId,
 		ContactId:   group.Uuid,
-		ContactType: model.ContactTypeGroup, // 群聊
-		Status:      model.StatusNormal,
+		ContactType: contact_enum.GROUP, // 群聊
+		Status:      contact_enum.NORMAL,
+		UpdateAt:    time.Now(),
 		CreatedAt:   time.Now(),
 	}
 	err = dao.DB.Create(&contact).Error
@@ -473,4 +479,136 @@ func (s *groupInfoService) RemoveGroupMembers(req request.RemoveGroupMembersRequ
 		return constant.SYS_ERR_MSG, -1
 	}
 	return "移除群聊成员成功", 0
+}
+
+// GetGroupInfoList 获取群聊列表 - 管理员
+// 管理员少，而且如果用户更改了，那么管理员会一直频繁删除redis，更新redis，比较麻烦，所以管理员暂时不使用redis缓存
+func (g *groupInfoService) GetGroupInfoList() (string, int, []respond.GetGroupListRespond) {
+	var groupList []model.GroupInfo
+	err := dao.DB.Unscoped().Find(&groupList).Error
+	if err != nil {
+		zlog.Error(err.Error())
+		return constant.SYS_ERR_MSG, -1, nil
+	}
+
+	var res []respond.GetGroupListRespond
+	for _, group := range groupList {
+		rp := respond.GetGroupListRespond{
+			Uuid:    group.Uuid,
+			Name:    group.Name,
+			OwnerId: group.OwnerId,
+			Status:  group.Status,
+		}
+		if group.DeletedAt.Valid {
+			rp.IsDeleted = true
+		} else {
+			rp.IsDeleted = false
+		}
+
+		res = append(res, rp)
+	}
+
+	return "获取群聊列表成功", 0, res
+}
+
+// DeleteGroups 删除列表中群聊 - 管理员
+func (g *groupInfoService) DeleteGroups(req request.DeleteGroupsRequest) (string, int) {
+	for _, uuid := range req.UuidList {
+		var deleted_at gorm.DeletedAt
+		deleted_at.Time = time.Now()
+		deleted_at.Valid = true
+
+		err := dao.DB.Model(&model.GroupInfo{}).Where("uuid = ?", uuid).Update("deleted_at", deleted_at).Error
+		if err != nil {
+			zlog.Error(err.Error())
+			return constant.SYS_ERR_MSG, -1
+		}
+
+		// 删除会话
+		var sessions []model.Session
+		err = dao.DB.Model(&model.Session{}).Where("receive_id = ?", uuid).Find(&sessions).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			zlog.Error(err.Error())
+			return constant.SYS_ERR_MSG, -1
+		}
+		for _, session := range sessions {
+			err := dao.DB.Model(&session).Update("deleted_at", deleted_at).Error
+			if err != nil {
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1
+			}
+		}
+
+		// 删除联系方式
+		var contactList []model.UserContact
+		err = dao.DB.Model(&model.UserContact{}).Where("contact_id = ?", uuid).Find(&contactList).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			zlog.Error(err.Error())
+			return constant.SYS_ERR_MSG, -1
+		}
+		for _, contact := range contactList {
+			err := dao.DB.Model(&contact).Update("deleted_at", deleted_at).Error
+			if err != nil {
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1
+			}
+		}
+
+		// 删除申请记录
+		var applies []model.ContactApply
+		err = dao.DB.Model(model.ContactApply{}).Where("contact_id = ?", uuid).Find(&applies).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				zlog.Info("没有申请记录需要删除")
+			} else {
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1
+			}
+		}
+
+		for _, apply := range applies {
+			err := dao.DB.Model(&apply).Update("deleted_at", deleted_at).Error
+			if err != nil {
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1
+			}
+		}
+	}
+
+	return "解散/删除群聊成功", 0
+}
+
+// SetGroupsStatus 设置群聊是否启用
+func (g *groupInfoService) SetGroupsStatus(req request.SetGroupsStatusRequest) (string, int) {
+	var deleted_at gorm.DeletedAt
+	deleted_at.Time = time.Now()
+	deleted_at.Valid = true
+
+	for _, uuid := range req.UuidList {
+		err := dao.DB.Model(&model.GroupInfo{}).Where("uuid = ?", uuid).Update("status", req.Status).Error
+		if err != nil {
+			zlog.Error(err.Error())
+			return constant.SYS_ERR_MSG, -1
+		}
+
+		// 如果是禁用群聊，要删除所有会话
+		if req.Status == group_enum.DISABLE {
+			var sessions []model.Session
+			err := dao.DB.Model(&model.Session{}).Where("receive_id = ?", uuid).Find(&sessions).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1
+			}
+
+			for _, session := range sessions {
+				err := dao.DB.Model(&session).Update("deleted_at", deleted_at).Error
+				if err != nil {
+					zlog.Error(err.Error())
+					return constant.SYS_ERR_MSG, -1
+				}
+			}
+		}
+	}
+
+	return "设置成功", 0
 }

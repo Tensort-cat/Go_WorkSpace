@@ -1,0 +1,9 @@
+{"level":"info","ts":"2026-04-13T15:04:58.490+0800","msg":"我是zlog.info()","func":"test.TestInfo","file":"d:/dev_soft/Go_WorkSpace/project/YukoChat/test/logger_test.go","line":9}
+{"level":"warn","ts":"2026-04-13T15:05:56.489+0800","msg":"我是zlog.Warn()","func":"test.TestWarn","file":"d:/dev_soft/Go_WorkSpace/project/YukoChat/test/logger_test.go","line":13}
+{"level":"error","ts":"2026-04-13T15:06:20.793+0800","msg":"我是zlog.Error()","func":"test.TestError","file":"d:/dev_soft/Go_WorkSpace/project/YukoChat/test/logger_test.go","line":17}
+{"level":"error","ts":"2026-04-13T15:09:43.550+0800","msg":"Failed to connect to MySQL","error":"dial tcp [::1]:3306: connectex: No connection could be made because the target machine actively refused it.","func":"dao.InitDB","file":"D:/dev_soft/Go_WorkSpace/project/YukoChat/internal/dao/db.go","line":26}
+{"level":"error","ts":"2026-04-13T15:09:43.575+0800","msg":"初始化 MySQL 连接失败","error":"dial tcp [::1]:3306: connectex: No connection could be made because the target machine actively refused it.","func":"main.main","file":"D:/dev_soft/Go_WorkSpace/project/YukoChat/cmd/main.go","line":22}
+{"level":"info","ts":"2026-04-13T15:11:05.068+0800","msg":":8000","func":"main.main","file":"D:/dev_soft/Go_WorkSpace/project/YukoChat/cmd/main.go","line":40}
+{"level":"info","ts":"2026-04-13T15:45:48.466+0800","msg":":8000","func":"main.main","file":"D:/dev_soft/Go_WorkSpace/project/YukoChat/cmd/main.go","line":40}
+{"level":"info","ts":"2026-04-13T15:49:04.045+0800","msg":"手机号或邮箱已被注册","func":"service.(*userInfoService).Register","file":"D:/dev_soft/Go_WorkSpace/project/YukoChat/internal/service/user_info.go","line":65}
+{"level":"info","ts":"2026-04-13T15:49:21.577+0800","msg":"手机号或邮箱已被注册","func":"service.(*userInfoService).Register","file":"D:/dev_soft/Go_WorkSpace/project/YukoChat/internal/service/user_info.go","line":65}

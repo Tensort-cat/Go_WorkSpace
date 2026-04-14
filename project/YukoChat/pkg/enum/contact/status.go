@@ -1,4 +1,4 @@
-package contact
+package contact_enum
 
 const (
 	NORMAL = iota

@@ -1,16 +1,16 @@
-package main
+package test
 
 import (
 	"fmt"
+	"testing"
 	"yuko_chat/internal/config"
 	"yuko_chat/internal/dao"
-	"yuko_chat/internal/route"
 	"yuko_chat/pkg/zlog"
 
 	"go.uber.org/zap"
 )
 
-func main() {
+func TestCfg(t *testing.T) {
 	// 初始化配置信息
 	if err := config.InitConfig(); err != nil {
 		zlog.Error("初始化配置信息失败", zap.String("error", err.Error()))
@@ -35,11 +35,6 @@ func main() {
 		return
 	}
 
-	// 开启 web 服务
-	port := fmt.Sprintf(":%d", config.Cfg.MainConfig.Port)
-	zlog.Info(port)
-	if err := route.GE.Run(port); err != nil {
-		zlog.Error("启动 Web 服务失败", zap.String("error", err.Error()))
-		return
-	}
+	fmt.Println(config.Cfg.StaticSrcConfig.StaticAvatarPath)
+	fmt.Println(config.Cfg.StaticSrcConfig.StaticFilePath)
 }

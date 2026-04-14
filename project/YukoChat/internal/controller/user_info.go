@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 普通用户功能
 func Login(ctx *gin.Context) {
 	var req request.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -78,4 +79,80 @@ func UpdateUserInfo(ctx *gin.Context) {
 	}
 	msg, ret := service.UserInfoService.UpdateUserInfo(req)
 	JsonBack(ctx, msg, ret, nil)
+}
+
+// 管理员功能
+// GetUserInfoList 获取用户列表
+func GetUserInfoList(c *gin.Context) {
+	var req request.GetUserInfoListRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code":    constant.SYS_ERR_CODE,
+			"message": constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret, userList := service.UserInfoService.GetUserInfoList(req)
+	JsonBack(c, message, ret, userList)
+}
+
+// AbleUsers 启用用户
+func AbleUsers(c *gin.Context) {
+	var req request.AbleUsersRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code":    constant.SYS_ERR_CODE,
+			"message": constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret := service.UserInfoService.AbleUsers(req)
+	JsonBack(c, message, ret, nil)
+}
+
+// DisableUsers 禁用用户
+func DisableUsers(c *gin.Context) {
+	var req request.AbleUsersRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code":    constant.SYS_ERR_CODE,
+			"message": constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret := service.UserInfoService.DisableUsers(req)
+	JsonBack(c, message, ret, nil)
+}
+
+// DeleteUsers 删除用户
+func DeleteUsers(c *gin.Context) {
+	var req request.AbleUsersRequest
+	if err := c.BindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code":    constant.SYS_ERR_CODE,
+			"message": constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret := service.UserInfoService.DeleteUsers(req)
+	JsonBack(c, message, ret, nil)
+}
+
+// SetAdmin 设置管理员
+func SetAdmin(c *gin.Context) {
+	var req request.AbleUsersRequest
+	if err := c.BindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code":    constant.SYS_ERR_CODE,
+			"message": constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret := service.UserInfoService.SetAdmin(req)
+	JsonBack(c, message, ret, nil)
 }

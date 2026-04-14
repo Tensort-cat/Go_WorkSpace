@@ -27,7 +27,7 @@ func CreateGroup(ctx *gin.Context) {
 
 // 获取我创建的群聊列表
 func GetMyGroups(ctx *gin.Context) {
-	var req request.GetMyGroupsRequest
+	var req request.OwnlistRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		zlog.Error(err.Error())
 		ctx.JSON(http.StatusOK, gin.H{
@@ -161,4 +161,40 @@ func RemoveGroupMembers(ctx *gin.Context) {
 	}
 	msg, ret := service.GroupInfoService.RemoveGroupMembers(req)
 	JsonBack(ctx, msg, ret, nil)
+}
+
+// GetGroupInfoList 获取群聊列表 - 管理员
+func GetGroupInfoList(c *gin.Context) {
+	message, ret, groupList := service.GroupInfoService.GetGroupInfoList()
+	JsonBack(c, message, ret, groupList)
+}
+
+// DeleteGroups 删除列表中群聊 - 管理员
+func DeleteGroups(c *gin.Context) {
+	var req request.DeleteGroupsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code": constant.SYS_ERR_CODE,
+			"msg":  constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret := service.GroupInfoService.DeleteGroups(req)
+	JsonBack(c, message, ret, nil)
+}
+
+// SetGroupsStatus 设置群聊是否启用
+func SetGroupsStatus(c *gin.Context) {
+	var req request.SetGroupsStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code": constant.SYS_ERR_CODE,
+			"msg":  constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	message, ret := service.GroupInfoService.SetGroupsStatus(req)
+	JsonBack(c, message, ret, nil)
 }

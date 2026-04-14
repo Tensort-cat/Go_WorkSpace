@@ -7,6 +7,6 @@ import (
 )
 
 func TestGenerateUUID(t *testing.T) {
-	uuid := util.GenUserUUID()
+	uuid := util.GenUUID("G")
 	fmt.Printf("生成的UUID: %s\n", uuid)
 }

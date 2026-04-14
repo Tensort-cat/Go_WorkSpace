@@ -1,7 +1,6 @@
 package route
 
 import (
-	"yuko_chat/internal/config"
 	"yuko_chat/internal/controller"
 
 	"github.com/gin-contrib/cors"
@@ -17,8 +16,8 @@ func init() {
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	corsConfig.AllowHeaders = []string{"Content-Type", "Authorization"}
 	GE.Use(cors.New(corsConfig))
-	GE.Static("/static/avatars", config.Cfg.StaticSrcConfig.StaticAvatarPath)
-	GE.Static("/static/files", config.Cfg.StaticSrcConfig.StaticFilePath)
+	// GE.Static("/static/avatars", config.Cfg.StaticSrcConfig.StaticAvatarPath)
+	// GE.Static("/static/files", config.Cfg.StaticSrcConfig.StaticFilePath)
 
 	GE.POST("/login", controller.Login)
 	GE.POST("/register", controller.Register)

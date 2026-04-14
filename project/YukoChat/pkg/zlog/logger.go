@@ -45,7 +45,7 @@ func getFileLogWriter() (writeSyncer zapcore.WriteSyncer) {
 	// 使用 lumberjack 实现 log rotate
 	// 文件超过 100MB 文件名会改成“原文件名 + 时间戳 + 原扩展名”的形式
 	lumberJackLogger := &lumberjack.Logger{
-		Filename:   "./logs/test.log",
+		Filename:   "../logs/app.log",
 		MaxSize:    100, // 单个文件最大100M
 		MaxBackups: 60,  // 多于 60 个日志文件后，清理较旧的日志
 		MaxAge:     1,   // 一天一切割
