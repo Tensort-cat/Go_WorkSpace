@@ -26,8 +26,8 @@ partition = 0
 timeout = 10 # 单位秒
 
 [staticSrcConfig]
-staticAvatarPath = "./static/avatars" # 存储用户头像的路径
-staticFilePath = "./static/files" # 存储用户文件的路径
+staticAvatarPath = "../static/avatars" # 存储用户头像的路径
+staticFilePath = "../static/files" # 存储用户文件的路径
 
 [emailConfig] # 用于发送验证码
 host = "smtp.qq.com"

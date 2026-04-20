@@ -14,6 +14,7 @@ import (
 	"yuko_chat/pkg/zlog"
 
 	"github.com/go-redis/redis"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -55,6 +56,18 @@ func (s *userInfoService) Login(telephone, password string) (string, *respond.Lo
 }
 
 func (s *userInfoService) Register(req request.RegisterRequest) (string, *respond.RegisterRespond, int) {
+	// 检查手机号格式
+	if vaild := util.IsValidPhoneNumber(req.Telephone); !vaild {
+		zlog.Info("手机号格式错误")
+		return "请输入合法的手机号", nil, -2
+	}
+
+	// 检查邮箱格式
+	if vaild := util.IsValidEmail(req.Email); !vaild {
+		zlog.Info("邮箱格式错误")
+		return "请输入合法的邮箱", nil, -2
+	}
+
 	// 用过的邮箱或手机号不能重复注册
 	result := dao.DB.Where("telephone = ? or email = ?", req.Telephone, req.Email).First(&model.UserInfo{})
 	if err := result.Error; err != nil {
@@ -121,9 +134,10 @@ func (s *userInfoService) SendVerificationCode(email string) (string, int) {
 	if err != nil {
 		return "发送邮箱验证码失败", -1
 	}
+	zlog.Info("邮箱验证码", zap.String("code", code))
 
 	redisKey := fmt.Sprintf("verify:%s", email)
-	if err = dao.SetKeyEx(redisKey, code, 1*time.Minute); err != nil {
+	if err = dao.SetKeyEx(redisKey, code, constant.REDIS_TIMEOUT); err != nil {
 		return "申请验证码频率过快", -1
 	}
 

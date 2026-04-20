@@ -142,6 +142,19 @@ func InitKafka() error {
 	KafkaClient.Admin = admin
 	KafkaClient.Brokers = brokers
 	KafkaClient.Topic = kafkaCfg.Topic
+
+	// 自动创建默认 topic（单分区，单副本）
+	// 这样就不需要手动调用 CreateTopic 了
+	err = CreateTopic(1, 1)
+	if err != nil {
+		// topic 创建失败时，需要清理已创建的资源
+		_ = admin.Close()
+		_ = consumer.Close()
+		_ = producer.Close()
+		zlog.Error("failed to create default kafka topic", zap.Error(err))
+		return err
+	}
+
 	return nil
 }
 
@@ -246,7 +259,7 @@ func CreateTopic(numPartitions int32, replicationFactor int16) error {
 // 返回值：
 // 1. partition: 消息最终写入的分区
 // 2. offset: 消息在该分区内的偏移量
-func SendMessage(key string, value string) (int32, int64, error) {
+func SendMessage(key string, value []byte) (int32, int64, error) {
 	if KafkaClient.Producer == nil {
 		err := errors.New("kafka producer is not initialized")
 		zlog.Error("failed to send kafka message", zap.Error(err))
@@ -258,7 +271,7 @@ func SendMessage(key string, value string) (int32, int64, error) {
 	message := &sarama.ProducerMessage{
 		Topic:     KafkaClient.Topic,
 		Partition: int32(config.Cfg.KafkaConfig.Partition),
-		Value:     sarama.StringEncoder(value),
+		Value:     sarama.ByteEncoder(value),
 	}
 
 	// key 不是必填项。

@@ -1,12 +1,19 @@
 package service
 
 import (
+	"io"
+	"os"
+	"path/filepath"
+	"yuko_chat/internal/config"
 	"yuko_chat/internal/dao"
 	"yuko_chat/internal/dto/request"
 	"yuko_chat/internal/dto/respond"
 	"yuko_chat/internal/model"
 	"yuko_chat/pkg/constant"
 	"yuko_chat/pkg/zlog"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type messageService struct {
@@ -76,3 +83,56 @@ func (m *messageService) GetGroupMessageList(req request.GetGroupMessageListRequ
 }
 
 // todo: 文件上传与下载
+// UploadAvator 上传头像
+func (m *messageService) UploadAvatar(c *gin.Context) (string, int) {
+	if err := m.uploadFile(c, config.Cfg.StaticSrcConfig.StaticAvatarPath); err != nil {
+		zlog.Error(err.Error())
+		return constant.SYS_ERR_MSG, -1
+	}
+
+	return "上传成功", 0
+}
+
+// UploadFile 上传文件
+func (m *messageService) UploadFile(c *gin.Context) (string, int) {
+	if err := m.uploadFile(c, config.Cfg.StaticSrcConfig.StaticFilePath); err != nil {
+		zlog.Error(err.Error())
+		return constant.SYS_ERR_MSG, -1
+	}
+	return "上传成功", 0
+}
+
+func (m *messageService) uploadFile(c *gin.Context, path string) error {
+	if err := c.Request.ParseMultipartForm(constant.FILE_MAX_SIZE); err != nil {
+		zlog.Error(err.Error())
+		return err
+	}
+	mForm := c.Request.MultipartForm
+	for key := range mForm.File {
+		file, fileHeader, err := c.Request.FormFile(key)
+		if err != nil {
+			zlog.Error(err.Error())
+			return err
+		}
+		defer file.Close()
+		zlog.Info("上传文件信息", zap.String("文件名", fileHeader.Filename), zap.Int64("文件大小", fileHeader.Size))
+		// 原来Filename应该是213451545.xxx，将Filename修改为avatar_ownerId.xxx
+		// 获取文件后缀
+		ext := filepath.Ext(fileHeader.Filename)
+		zlog.Info("文件后缀", zap.String("ext", ext))
+		localFileName := path + "/" + fileHeader.Filename
+		out, err := os.Create(localFileName)
+		if err != nil {
+			zlog.Error(err.Error())
+			return err
+		}
+		defer out.Close()
+		if _, err := io.Copy(out, file); err != nil {
+			zlog.Error(err.Error())
+			return err
+		}
+		zlog.Info("完成文件上传")
+	}
+
+	return nil
+}

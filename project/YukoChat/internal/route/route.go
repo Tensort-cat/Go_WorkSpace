@@ -1,6 +1,7 @@
 package route
 
 import (
+	"yuko_chat/internal/config"
 	"yuko_chat/internal/controller"
 
 	"github.com/gin-contrib/cors"
@@ -9,15 +10,15 @@ import (
 
 var GE *gin.Engine
 
-func init() {
+func InitRoute() {
 	GE = gin.Default()
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{"*"}
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	corsConfig.AllowHeaders = []string{"Content-Type", "Authorization"}
 	GE.Use(cors.New(corsConfig))
-	// GE.Static("/static/avatars", config.Cfg.StaticSrcConfig.StaticAvatarPath)
-	// GE.Static("/static/files", config.Cfg.StaticSrcConfig.StaticFilePath)
+	GE.Static("/static/avatars", config.Cfg.StaticSrcConfig.StaticAvatarPath)
+	GE.Static("/static/files", config.Cfg.StaticSrcConfig.StaticFilePath)
 
 	GE.POST("/login", controller.Login)
 	GE.POST("/register", controller.Register)
@@ -27,6 +28,7 @@ func init() {
 		user.POST("/updateUserInfo", controller.UpdateUserInfo)
 		user.POST("/getUserInfo", controller.GetUserInfo)
 		user.POST("/sendSmsCode", controller.SendVerificationCode)
+		user.POST("/wsLogout", controller.WsLogout)
 	}
 
 	group := GE.Group("/group")
@@ -42,4 +44,39 @@ func init() {
 		group.POST("/removeGroupMembers", controller.RemoveGroupMembers)
 		group.POST("/getGroupInfoList", controller.GetGroupMembers)
 	}
+
+	message := GE.Group("/message")
+	{
+		message.POST("/getMessageList", controller.GetMessageList)
+		message.POST("/getGroupMessageList", controller.GetGroupMessageList)
+		message.POST("/uploadAvatar", controller.UploadAvatar)
+		message.POST("/uploadFile", controller.UploadFile)
+	}
+
+	session := GE.Group("/session")
+	{
+		session.POST("/openSession", controller.OpenSession)
+		session.POST("/getUserSessionList", controller.GetUserSessionList)
+		session.POST("/getGroupSessionList", controller.GetGroupSessionList)
+		session.POST("/deleteSession", controller.DeleteSession)
+		session.POST("checkOpenSessionAllowed", controller.CheckOpenSessionAllowed)
+	}
+
+	contact := GE.Group("/contact")
+	{
+		contact.POST("/getContactList", controller.GetContactList)
+		contact.POST("/loadMyJoinedGroup", controller.LoadMyJoinedGroup)
+		contact.POST("/getContactInfo", controller.GetContactInfo)
+		contact.POST("/deleteContact", controller.DeleteContact)
+		contact.POST("/applyContact", controller.ApplyContact)
+		contact.POST("/getNewContactList", controller.GetNewContactList)
+		contact.POST("/passContactApply", controller.PassContactApply)
+		contact.POST("/blackContact", controller.BlackContact)
+		contact.POST("/cancelBlackContact", controller.CancelBlackContact)
+		contact.POST("/getAddGroupList", controller.GetAddGroupList)
+		contact.POST("/refuseContactApply", controller.RefuseContactApply)
+		contact.POST("/blackApply", controller.BlackApply)
+	}
+
+	GE.GET("/wsLogin", controller.WsLogin)
 }

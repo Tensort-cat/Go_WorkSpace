@@ -163,3 +163,9 @@ func FlushAllKeys() error {
 	}
 	return nil
 }
+
+// 关闭 redis 连接
+func CloseRedis() error {
+	err := redisClient.Close()
+	return err
+}

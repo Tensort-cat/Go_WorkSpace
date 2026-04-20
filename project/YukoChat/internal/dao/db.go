@@ -29,3 +29,9 @@ func InitDB() error {
 	DB = db
 	return nil
 }
+
+func CloseDB() error {
+	db_, _ := DB.DB()
+	err := db_.Close()
+	return err
+}

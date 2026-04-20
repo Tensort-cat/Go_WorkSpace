@@ -36,3 +36,15 @@ func GetGroupMessageList(c *gin.Context) {
 	message, ret, data := service.MessageService.GetGroupMessageList(req)
 	JsonBack(c, message, ret, data)
 }
+
+// UploadAvatar 上传头像
+func UploadAvatar(c *gin.Context) {
+	message, ret := service.MessageService.UploadAvatar(c)
+	JsonBack(c, message, ret, nil)
+}
+
+// UploadFile 上传文件
+func UploadFile(c *gin.Context) {
+	message, ret := service.MessageService.UploadFile(c)
+	JsonBack(c, message, ret, nil)
+}
