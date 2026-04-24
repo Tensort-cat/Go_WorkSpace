@@ -43,14 +43,14 @@ func (c *Client) Read() {
 	for {
 		_, jsonMsg, err := c.Conn.ReadMessage()
 		if err != nil {
-			zlog.Error(err.Error())
+			zlog.Error("websocket 断开", zap.Error(err), zap.String("clientId", c.Uuid))
 			return // 直接断开 ws 连接
 		}
 
 		// 反序列化数据，只为了看看他长啥样，方便调试
 		var msg request.ChatMessageRequest
 		if err := json.Unmarshal(jsonMsg, &msg); err != nil {
-			zlog.Error(err.Error())
+			zlog.Error("反序列化消息失败", zap.Error(err))
 		}
 		zlog.Debug("收到消息", zap.Any("message", msg))
 

@@ -15,7 +15,6 @@ import (
 	"yuko_chat/pkg/util"
 	"yuko_chat/pkg/zlog"
 
-	"go.uber.org/zap/zapcore"
 	"gorm.io/gorm"
 )
 
@@ -33,8 +32,19 @@ func (s *groupInfoService) CreateGroup(req request.CreateGroupRequest) (string, 
 		AddMode:   req.AddMode,
 		Avatar:    req.Avatar,
 		CreatedAt: time.Now(),
+		MemberCnt: 1,
 	}
-	err := dao.DB.Create(&group).Error
+
+	// 群聊一开始只有群主一个成员，成员列表是一个字符串数组的json格式
+	members := []string{req.OwnerId}
+	membersBytes, err := json.Marshal(members)
+	if err != nil {
+		zlog.Error(err.Error())
+		return "创建群聊失败", -2
+	}
+	group.Members = membersBytes
+
+	err = dao.DB.Create(&group).Error
 	if err != nil {
 		return "创建群聊失败", -2
 	}
@@ -53,13 +63,23 @@ func (s *groupInfoService) CreateGroup(req request.CreateGroupRequest) (string, 
 	return "群聊创建成功", 0
 }
 
-func (s *groupInfoService) GetMyGroups(req request.OwnlistRequest) (string, int, []model.GroupInfo) {
+func (s *groupInfoService) GetMyGroups(req request.OwnlistRequest) (string, int, []respond.GetMyGroupsRespond) {
 	var groups []model.GroupInfo
 	err := dao.DB.Where("owner_id = ?", req.OwnerId).Find(&groups).Error
 	if err != nil {
 		return "获取群聊列表失败", -2, nil
 	}
-	return "获取群聊列表成功", 0, groups
+
+	var res []respond.GetMyGroupsRespond
+	for _, group := range groups {
+		rep := respond.GetMyGroupsRespond{
+			GroupId:   group.Uuid,
+			GroupName: group.Name,
+			Avatar:    group.Avatar,
+		}
+		res = append(res, rep)
+	}
+	return "获取群聊列表成功", 0, res
 }
 
 func (s *groupInfoService) CheckGroupAddMode(req request.CheckGroupAddModeRequest) (string, int, int8) {
@@ -76,7 +96,7 @@ func (s *groupInfoService) CheckGroupAddMode(req request.CheckGroupAddModeReques
 func (s *groupInfoService) EnterGroupDirectly(req request.EnterGroupDirectlyRequest) (string, int) {
 	// 检查群聊存不存在
 	var group model.GroupInfo
-	err := dao.DB.Where("uuid = ?", req.GroupId).First(&group).Error
+	err := dao.DB.Where("uuid = ?", req.Owner_id).First(&group).Error
 	if err != nil {
 		zlog.Error(err.Error())
 		return constant.SYS_ERR_MSG, -1
@@ -216,7 +236,7 @@ func (s *groupInfoService) DismissGroup(req request.DismissGroupRequest) (string
 	deleteAt.Valid = true
 	err := dao.DB.Model(&model.GroupInfo{}).
 		Where("uuid = ?", req.GroupId).
-		Update("delete_at", deleteAt).
+		Update("deleted_at", deleteAt).
 		Error
 	if err != nil {
 		zlog.Error(err.Error())
@@ -236,7 +256,7 @@ func (s *groupInfoService) DismissGroup(req request.DismissGroupRequest) (string
 	for _, session := range sessions {
 		err = dao.DB.Model(&session).
 			Updates(map[string]any{
-				"delete_at": deleteAt,
+				"deleted_at": deleteAt,
 			}).Error
 		if err != nil {
 			zlog.Error(err.Error())
@@ -257,7 +277,7 @@ func (s *groupInfoService) DismissGroup(req request.DismissGroupRequest) (string
 	for _, contact := range contacts {
 		err = dao.DB.Model(&contact).
 			Updates(map[string]any{
-				"delete_at": deleteAt,
+				"deleted_at": deleteAt,
 			}).Error
 		if err != nil {
 			zlog.Error(err.Error())
@@ -279,7 +299,7 @@ func (s *groupInfoService) DismissGroup(req request.DismissGroupRequest) (string
 	for _, apply := range applies {
 		err = dao.DB.Model(&apply).
 			Updates(map[string]any{
-				"delete_at": deleteAt,
+				"deleted_at": deleteAt,
 			}).Error
 		if err != nil {
 			zlog.Error(err.Error())
@@ -354,7 +374,6 @@ func (s *groupInfoService) UpdateGroupInfo(req request.UpdateGroupInfoRequest) (
 	for _, session := range sessions {
 		session.ReceiveName = group.Name
 		session.Avatar = group.Avatar
-		zlog.Info("更新群聊相关会话", zapcore.Field{Key: "session_id", String: session.Uuid})
 		err = dao.DB.Save(&session).Error
 		if err != nil {
 			zlog.Error(err.Error())

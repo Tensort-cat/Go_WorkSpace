@@ -63,6 +63,44 @@ func TestGetMsg(t *testing.T) {
 	}
 }
 
+// 从最老消息开始消费，直到消费完所有消息
+func TestConsumeAllMessages(t *testing.T) {
+	setupKafka(t)
+	defer teardownKafka(t)
+	consumer, err := dao.NewPartitionConsumer(sarama.OffsetOldest)
+	if err != nil {
+		t.Fatalf("failed to create consumer: %v", err)
+	}
+	defer consumer.Close()
+	for kafkaMsg := range consumer.Messages() {
+		var res request.ChatMessageRequest
+		if err := json.Unmarshal(kafkaMsg.Value, &res); err != nil {
+			t.Fatalf("failed to unmarshal message: %v", err)
+		}
+		t.Log(res)
+	}
+}
+
+// 发消息
+func TestSendMessage(t *testing.T) {
+	setupKafka(t)
+	defer teardownKafka(t)
+	req := request.ChatMessageRequest{
+		SessionId: "ssss",
+		Content:   "dwqwdada",
+		Type:      2,
+	}
+	jsonMsg, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("failed to marshal message: %v", err)
+	}
+	partition, offset, err := dao.SendMessage("0", jsonMsg)
+	if err != nil {
+		t.Fatalf("failed to send message: %v", err)
+	}
+	t.Logf("message sent to partition %d at offset %d", partition, offset)
+}
+
 func TestCleanKafka(t *testing.T) {
 	setupKafka(t)
 	defer teardownKafka(t)

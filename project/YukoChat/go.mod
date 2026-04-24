@@ -56,10 +56,12 @@ require (
 	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-redis/redis v6.15.9+incompatible
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/natefinch/lumberjack v2.0.0+incompatible
+	github.com/unrolled/secure v1.17.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/text v0.35.0 // indirect
 	gorm.io/driver/mysql v1.6.0

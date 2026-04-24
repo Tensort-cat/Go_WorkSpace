@@ -83,7 +83,10 @@ func (s *Server) Start() {
 			zlog.Error("Kafka 消费者创建失败", zap.Error(err))
 			return
 		}
-		defer consumer.Close()
+		defer func() {
+			consumer.Close()
+			zlog.Info("Kafka 消费者已关闭")
+		}()
 
 		// 阻塞式消费消息
 		for kafkaMsg := range consumer.Messages() {
@@ -437,7 +440,7 @@ func (s *Server) Start() {
 // 将https://127.0.0.1:8000/static/xxx 转为 /static/xxx
 func normalizePath(path string) string {
 	// 查找 "/static/" 的位置
-	if path == "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" || path == "" {
+	if path == "https://i.bobopic.com/small/69326036.jpg-216" || path == "" {
 		return path
 	}
 	staticIndex := strings.Index(path, "/static/")

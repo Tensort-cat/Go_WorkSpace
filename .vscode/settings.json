@@ -1,0 +1,5 @@
+{
+  "eslint.workingDirectories": [
+    { "directory": "project/YukoChat/front" }
+  ]
+}

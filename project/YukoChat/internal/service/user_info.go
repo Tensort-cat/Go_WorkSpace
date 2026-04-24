@@ -88,10 +88,11 @@ func (s *userInfoService) Register(req request.RegisterRequest) (string, *respon
 		}
 		return "系统错误", nil, -1
 	}
-	if storedCode != req.VerificationCode {
+	if storedCode != req.SmsCode {
 		return "验证码错误", nil, -1
 	}
 
+	// 加密密码
 	encryptPwd, err := util.HashPassword(req.Password)
 	if err != nil {
 		return constant.SYS_ERR_MSG, nil, -1
@@ -105,7 +106,6 @@ func (s *userInfoService) Register(req request.RegisterRequest) (string, *respon
 		CreatedAt: time.Now(),
 	}
 
-	dao.DB.AutoMigrate(&model.UserInfo{})
 	err = dao.DB.Create(&userInfo).Error
 	if err != nil {
 		return "创建用户失败", nil, -2
@@ -179,6 +179,7 @@ func (s *userInfoService) UpdateUserInfo(req request.UpdateUserInfoRequest) (str
 		"birthday":  req.Birthday,
 		"signature": req.Signature,
 		"avatar":    req.Avatar,
+		"gender":    fmt.Sprintf("%d", req.Gender),
 	}
 
 	for key, value := range fields {
@@ -420,4 +421,44 @@ func (u *userInfoService) SetAdmin(req request.AbleUsersRequest) (string, int) {
 	}
 
 	return "设置管理员成功", 0
+}
+
+// SmsLogin 短信验证码登录
+func (s *userInfoService) SmsLogin(req request.SmsLoginRequest) (string, *respond.LoginRespond, int) {
+	redisKey := fmt.Sprintf("verify:%s", req.Email)
+	storedCode, err := dao.GetKeyNilIsErr(redisKey)
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "验证码不存在或已过期", nil, -2
+		}
+		return "系统错误", nil, -1
+	}
+	if storedCode != req.SmsCode {
+		return "验证码错误", nil, -2
+	}
+
+	var userInfo model.UserInfo
+	err = dao.DB.Where("email = ?", req.Email).First(&userInfo).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			zlog.Info("邮箱输入错误")
+			return "邮箱输入错误", nil, -2
+		}
+		return constant.SYS_ERR_MSG, nil, -1
+	}
+
+	loginRsp := &respond.LoginRespond{
+		Uuid:      userInfo.Uuid,
+		Telephone: userInfo.Telephone,
+		Nickname:  userInfo.Nickname,
+		Email:     userInfo.Email,
+		Avatar:    userInfo.Avatar,
+		Gender:    userInfo.Gender,
+		Birthday:  userInfo.Birthday,
+		Signature: userInfo.Signature,
+		IsAdmin:   userInfo.IsAdmin,
+		Status:    userInfo.Status,
+	}
+
+	return "登录成功", loginRsp, 0
 }

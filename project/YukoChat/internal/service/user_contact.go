@@ -26,8 +26,8 @@ type userContactService struct {
 
 func (s *userContactService) GetContactList(req request.GetContactListRequest) (string, int, []respond.UserListResponse) {
 	var contactList []model.UserContact
-	err := dao.DB.Where("user_id = ? and status not in (?, ?)", // 去掉删除过的好友
-		req.UserId, contact_enum.DELETE, contact_enum.BE_BLACK).
+	err := dao.DB.Model(&model.UserContact{}).Where("user_id = ? and status not in (?, ?)",
+		req.Owner_id, contact_enum.DELETE, contact_enum.BE_BLACK).
 		Find(&contactList).
 		Error
 	if err != nil {
@@ -43,10 +43,10 @@ func (s *userContactService) GetContactList(req request.GetContactListRequest) (
 	var res []respond.UserListResponse
 	for _, contact := range contactList {
 		// 首先联系人是用户不是群聊
-		if contact.ContactType == contact_enum.USER {
+		if contact.ContactId[0] == 'U' {
 			// 获取用户信息
 			var user model.UserInfo
-			err := dao.DB.Where("uuid = ?", req.UserId).First(&user).Error
+			err := dao.DB.Where("uuid = ?", contact.ContactId).First(&user).Error
 			if err != nil {
 				zlog.Error(err.Error())
 				return constant.SYS_ERR_MSG, -1, nil
@@ -66,7 +66,7 @@ func (s *userContactService) GetContactList(req request.GetContactListRequest) (
 func (s *userContactService) LoadMyJoinedGroup(req request.GetContactListRequest) (string, int, []respond.LoadMyJoinedGroupRespond) {
 	// 先找出用户的 contact 记录
 	var contactList []model.UserContact
-	err := dao.DB.Where("user_id = ?", req).Find(&contactList).Error
+	err := dao.DB.Where("user_id = ?", req.Owner_id).Find(&contactList).Error
 	if err != nil {
 		zlog.Error(err.Error())
 		return constant.SYS_ERR_MSG, -1, nil
@@ -393,17 +393,17 @@ func (s *userContactService) PassContactApply(req request.PassContactApplyReques
 	// ownerId 如果是用户的话就是登录用户，如果是群聊的话就是群聊id
 	// 先看看是加好友还是加群
 	var apply model.ContactApply
-	err := dao.DB.Where("user_id = ? and contact_id = ?", req.OwnerId, req.ContactId).First(&apply).Error
+	err := dao.DB.Where("contact_id = ? and user_id = ?", req.OwnerId, req.ContactId).First(&apply).Error
 	if err != nil {
 		zlog.Error(err.Error())
 		return constant.SYS_ERR_MSG, -1
 	}
 
-	switch req.ContactId[0] {
+	switch req.OwnerId[0] {
 	case 'U': // 好友申请
 		// 对方可能已经被封禁了
 		var user model.UserInfo
-		err = dao.DB.First(&user, "uuid = ?", req.OwnerId).Error
+		err = dao.DB.First(&user, "uuid = ?", req.ContactId).Error
 		if err != nil {
 			zlog.Error(err.Error())
 			return constant.SYS_ERR_MSG, -1
@@ -454,7 +454,7 @@ func (s *userContactService) PassContactApply(req request.PassContactApplyReques
 	case 'G': // 入群申请
 		// 先看群有没有被解散或封禁
 		var group model.GroupInfo
-		err := dao.DB.First(&group, "uuid = ?", req.ContactId).Error
+		err := dao.DB.First(&group, "uuid = ?", req.OwnerId).Error
 		if err != nil {
 			zlog.Error(err.Error())
 			return constant.SYS_ERR_MSG, -1

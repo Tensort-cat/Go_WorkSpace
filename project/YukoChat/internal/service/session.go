@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 	"yuko_chat/internal/dao"
 	"yuko_chat/internal/dto/request"
@@ -14,6 +15,7 @@ import (
 	"yuko_chat/pkg/util"
 	"yuko_chat/pkg/zlog"
 
+	"github.com/go-redis/redis"
 	"gorm.io/gorm"
 )
 
@@ -23,48 +25,84 @@ type sessionService struct {
 var SessionService = new(sessionService)
 
 func (s *sessionService) OpenSession(req request.OpenSessionRequest) (string, int, string) {
-	var session model.Session
-	err := dao.DB.Where("send_id = ? and receive_id = ?", req.SendId, req.ReceiveId).First(&session).Error
+	// 先看 redis 有没有
+	redisKey := fmt.Sprintf("session:%s:%s", req.SendId, req.ReceiveId)
+	sessionId, err := dao.GetKeyNilIsErr(redisKey)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) { // 创建新会话
-			zlog.Info("会话没有找到，创建新会话")
-			createReq := request.CreateSessionRequest{
-				SendId:    req.SendId,
-				ReceiveId: req.ReceiveId,
+		if err == redis.Nil {
+			var session model.Session
+			err := dao.DB.Where("send_id = ? and receive_id = ?", req.SendId, req.ReceiveId).First(&session).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) { // 创建新会话
+					zlog.Info("会话没有找到，创建新会话")
+					createReq := request.CreateSessionRequest{
+						SendId:    req.SendId,
+						ReceiveId: req.ReceiveId,
+					}
+					return s.CreateSession(createReq)
+				}
+				return constant.SYS_ERR_MSG, -1, ""
 			}
-			return s.CreateSession(createReq)
+			// 放 redis
+			dao.SetKeyEx(redisKey, session.Uuid, constant.SESSION_TIMEOUT)
+			return "会话打开成功", 0, session.Uuid
 		}
 		return constant.SYS_ERR_MSG, -1, ""
 	}
 
-	// todo: redis 缓存
-
-	// 会话存在
-	return "会话打开成功", 0, session.Uuid
+	return "会话打开成功", 0, sessionId
 }
 
 func (s *sessionService) CreateSession(req request.CreateSessionRequest) (string, int, string) {
 	// 取出对方的用户名和头像
-	var to model.UserInfo
-	err := dao.DB.First(&to, "uuid = ?", req.ReceiveId).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			zlog.Info("用户不存在")
-			return "用户不存在", 0, ""
+	// 看是私聊还是群聊
+	var session model.Session
+	switch req.ReceiveId[0] {
+	case 'U': // 私聊
+		{
+			var to model.UserInfo
+			err := dao.DB.First(&to, "uuid = ?", req.ReceiveId).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					zlog.Info("用户不存在")
+					return "用户不存在", 0, ""
+				}
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1, ""
+			}
+			session = model.Session{
+				Uuid:        util.GenUUID("S"),
+				SendId:      req.SendId,
+				ReceiveId:   req.ReceiveId,
+				ReceiveName: to.Nickname,
+				Avatar:      to.Avatar,
+				CreatedAt:   time.Now(),
+			}
 		}
-		zlog.Error(err.Error())
-		return constant.SYS_ERR_MSG, -1, ""
-	}
-	session := model.Session{
-		Uuid:        util.GenUUID("S"),
-		SendId:      req.SendId,
-		ReceiveId:   req.ReceiveId,
-		ReceiveName: to.Nickname,
-		Avatar:      to.Avatar,
-		CreatedAt:   time.Now(),
+	case 'G': // 群聊
+		{
+			var to model.GroupInfo
+			err := dao.DB.First(&to, "uuid = ?", req.ReceiveId).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					zlog.Info("群聊不存在")
+					return "群聊不存在", 0, ""
+				}
+				zlog.Error(err.Error())
+				return constant.SYS_ERR_MSG, -1, ""
+			}
+			session = model.Session{
+				Uuid:        util.GenUUID("S"),
+				SendId:      req.SendId,
+				ReceiveId:   req.ReceiveId,
+				ReceiveName: to.Name,
+				Avatar:      to.Avatar,
+				CreatedAt:   time.Now(),
+			}
+		}
 	}
 
-	err = dao.DB.Create(&session).Error
+	err := dao.DB.Create(&session).Error
 	if err != nil {
 		zlog.Error(err.Error())
 		return constant.SYS_ERR_MSG, -1, ""
@@ -131,11 +169,25 @@ func (s *sessionService) GetGroupSessionList(req request.OwnlistRequest) (string
 
 // DeleteSession 删除会话
 func (s *sessionService) DeleteSession(req request.DeleteSessionRequest) (string, int) {
+	// 先删 redis 缓存
+	var session model.Session
+	err := dao.DB.First(&session, "uuid = ?", req.SessionId).Error
+	if err != nil {
+		zlog.Error(err.Error())
+		return constant.SYS_ERR_MSG, -1
+	}
+	redisKey := fmt.Sprintf("session:%s:%s", session.SendId, session.ReceiveId)
+	err = dao.DelKeyIfExists(redisKey)
+	if err != nil {
+		zlog.Error(err.Error())
+		return constant.SYS_ERR_MSG, -1
+	}
+
 	var deleted_at gorm.DeletedAt
 	deleted_at.Time = time.Now()
 	deleted_at.Valid = true
 
-	err := dao.DB.Model(&model.Session{}).Where("uuid = ?", req.SessionId).Update("deleted_at", deleted_at).Error
+	err = dao.DB.Model(&model.Session{}).Where("uuid = ?", req.SessionId).Update("deleted_at", deleted_at).Error
 	if err != nil {
 		zlog.Error(err.Error())
 		return constant.SYS_ERR_MSG, -1
@@ -150,6 +202,9 @@ func (s *sessionService) CheckOpenSessionAllowed(req request.CreateSessionReques
 	var contact model.UserContact
 	err := dao.DB.Where("user_id = ? and contact_id = ?", req.SendId, req.ReceiveId).First(&contact).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "不能发起对话", -2, false
+		}
 		zlog.Error(err.Error())
 		return constant.SYS_ERR_MSG, -1, false
 	}

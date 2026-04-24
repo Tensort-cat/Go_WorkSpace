@@ -1,6 +1,6 @@
 package request
 
 type EnterGroupDirectlyRequest struct {
-	GroupId   string `json:"group_id"`
+	Owner_id  string `json:"owner_id"`
 	ContactId string `json:"contact_id"`
 }

@@ -1,5 +1,5 @@
 package request
 
 type GetContactListRequest struct {
-	UserId uint `json:"userId"`
+	Owner_id string `json:"owner_id"`
 }

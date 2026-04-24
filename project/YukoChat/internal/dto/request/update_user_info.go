@@ -7,4 +7,5 @@ type UpdateUserInfoRequest struct {
 	Birthday  string `json:"birthday"`
 	Signature string `json:"signature"`
 	Avatar    string `json:"avatar"`
+	Gender    int8   `json:"gender"`
 }

@@ -36,27 +36,33 @@ CREATE TABLE group_infos (
 
 -- 消息表
 CREATE TABLE messages (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '自增id',
-    uuid CHAR(20) NOT NULL COMMENT '消息uuid',
-    session_id CHAR(20) NOT NULL COMMENT '会话uuid',
-    type TINYINT NOT NULL COMMENT '消息类型，0.文本，1.文件，2.通话',
-    content TEXT DEFAULT NULL COMMENT '消息内容',
-    url CHAR(255) DEFAULT NULL COMMENT '消息url',
-    send_id CHAR(20) NOT NULL COMMENT '发送者uuid',
-    send_name VARCHAR(20) NOT NULL COMMENT '发送者昵称',
-    send_avatar VARCHAR(255) NOT NULL COMMENT '发送者头像',
-    receive_id CHAR(20) NOT NULL COMMENT '接受者uuid',
-    file_type CHAR(10) DEFAULT NULL COMMENT '文件类型',
-    file_name VARCHAR(50) DEFAULT NULL COMMENT '文件名',
-    file_size CHAR(20) DEFAULT NULL COMMENT '文件大小',
-    status TINYINT NOT NULL COMMENT '状态，0.未发送，1.已发送',
-    created_at DATETIME NOT NULL COMMENT '创建时间',
-    av_data TEXT DEFAULT NULL COMMENT '通话传递数据',
-    UNIQUE KEY idx_uuid (uuid),
-    KEY idx_session_id (session_id),
-    KEY idx_send_id (send_id),
-    KEY idx_receive_id (receive_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息表';
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '自增id',
+  `uuid` CHAR(20) NOT NULL COMMENT '消息uuid',
+  `session_id` CHAR(20) NOT NULL COMMENT '会话uuid',
+  `type` TINYINT NOT NULL COMMENT '消息类型，0.文本，1.语音，2.文件，3.通话',
+  `content` TEXT COMMENT '消息内容',
+  `url` CHAR(255) COMMENT '消息url',
+  `send_id` CHAR(20) NOT NULL COMMENT '发送者uuid',
+  `send_name` VARCHAR(20) NOT NULL COMMENT '发送者昵称',
+  `send_avatar` VARCHAR(255) NOT NULL COMMENT '发送者头像',
+  `receive_id` CHAR(20) NOT NULL COMMENT '接受者uuid',
+  `file_type` CHAR(10) COMMENT '文件类型',
+  `file_name` VARCHAR(50) COMMENT '文件名',
+  `file_size` CHAR(20) COMMENT '文件大小',
+  `status` TINYINT NOT NULL COMMENT '状态，0.未发送，1.已发送',
+  `created_at` DATETIME NOT NULL COMMENT '创建时间',
+  `send_at` DATETIME NULL COMMENT '发送时间',
+  `av_data` TEXT COMMENT '通话传递数据',
+
+  PRIMARY KEY (`id`),
+
+  UNIQUE KEY `uk_uuid` (`uuid`),
+
+  KEY `idx_session_id` (`session_id`),
+  KEY `idx_send_id` (`send_id`),
+  KEY `idx_receive_id` (`receive_id`)
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消息表';
 
 -- 会话表
 CREATE TABLE sessions (

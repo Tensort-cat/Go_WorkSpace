@@ -24,8 +24,10 @@ var MessageService = new(messageService)
 // GetMessageList 获取聊天记录
 func (m *messageService) GetMessageList(req request.GetMessageListRequest) (string, int, []respond.GetMessageListRespond) {
 	var messages []model.Message
-	err := dao.DB.Where(
-		"(send_id = ? and receive_id = ?) or (send_id = ? and receive_id = ?)", req.UserOneId, req.UserTwoId, req.UserTwoId, req.UserOneId).
+	err := dao.DB.
+		Order("created_at asc").
+		Where(
+			"(send_id = ? and receive_id = ?) or (send_id = ? and receive_id = ?)", req.UserOneId, req.UserTwoId, req.UserTwoId, req.UserOneId).
 		Find(&messages).
 		Error
 	if err != nil {

@@ -156,3 +156,18 @@ func SetAdmin(c *gin.Context) {
 	message, ret := service.UserInfoService.SetAdmin(req)
 	JsonBack(c, message, ret, nil)
 }
+
+// SmsLogin 短信验证码登录
+func SmsLogin(c *gin.Context) {
+	var req request.SmsLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		zlog.Error(err.Error())
+		c.JSON(http.StatusOK, gin.H{
+			"code": constant.SYS_ERR_CODE,
+			"msg":  constant.SYS_ERR_MSG,
+		})
+		return
+	}
+	msg, userInfo, ret := service.UserInfoService.SmsLogin(req)
+	JsonBack(c, msg, ret, userInfo)
+}
