@@ -32,6 +32,6 @@ staticFilePath = "../static/files" # 存储用户文件的路径
 [emailConfig] # 用于发送验证码
 host = "smtp.qq.com"
 port = 465
-username = "1030693032@qq.com"
-password = "swobdqinvydebeba"
-from = "1030693032@qq.com"
+username = "你的qq邮箱"
+password = "你的qq邮箱授权码"
+from = "你的qq邮箱"
