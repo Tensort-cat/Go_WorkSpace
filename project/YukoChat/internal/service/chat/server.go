@@ -440,7 +440,7 @@ func (s *Server) Start() {
 // 将https://127.0.0.1:8000/static/xxx 转为 /static/xxx
 func normalizePath(path string) string {
 	// 查找 "/static/" 的位置
-	if path == "https://i.bobopic.com/small/69326036.jpg-216" || path == "" {
+	if path == "https://yuko-chat-1426335623.cos.ap-chengdu.myqcloud.com/default_avatar.jpg" || path == "" {
 		return path
 	}
 	staticIndex := strings.Index(path, "/static/")

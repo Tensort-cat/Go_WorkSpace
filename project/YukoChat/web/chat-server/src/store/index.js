@@ -1,12 +1,12 @@
 import { createStore } from 'vuex'
 
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+
 export default createStore({
   state: {
     // web服务器地址
-    // backendUrl: 'https://192.168.2.114:8000',
-    // wsUrl: 'wss://192.168.2.114:8000',
-    backendUrl: 'https://192.168.3.24/api',
-    wsUrl: 'wss://192.168.3.24',
+    backendUrl: '/api',
+    wsUrl: `${protocol}://${window.location.host}`,
     // 信令服务器地址
     // signalUrl: 'wss://127.0.0.1:8001',
     userInfo: (sessionStorage.getItem('userInfo') && JSON.parse(sessionStorage.getItem('userInfo'))) || {},
