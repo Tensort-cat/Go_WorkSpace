@@ -63,7 +63,7 @@ func (c *Client) Read() {
 	}
 }
 
-// // 从 SendBack 通道读取消息发送给websocket
+// 从 SendBack 通道读取消息发送给websocket
 func (c *Client) Write() {
 	for msg := range c.SendBack {
 		// 写到 ws 连接上

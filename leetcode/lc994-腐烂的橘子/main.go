@@ -18,8 +18,8 @@ func main() {
 			}
 		}
 	}
-	res := 0
 
+	res := 0
 	// 对烂橘子逐层bfs
 	for {
 		nextQueue := [][2]int{}

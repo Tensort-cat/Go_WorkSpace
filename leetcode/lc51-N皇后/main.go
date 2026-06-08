@@ -1,3 +1,7 @@
+package main
+
+import "strings"
+
 func solveNQueens(n int) [][]string {
 	var res [][]string
 	chessboard := make([][]string, n)

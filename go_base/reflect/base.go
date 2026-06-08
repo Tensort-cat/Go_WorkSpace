@@ -26,7 +26,7 @@ func main() {
 	fmt.Println(reflectType) // string
 
 	// 通过Kind，可以知晓空接口存储的值究竟是什么基础类型
-	var eface any
+	var eface interface{}
 	eface = 114514
 	fmt.Println(reflect.TypeOf(eface).Kind()) // int
 

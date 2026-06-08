@@ -1,10 +1,9 @@
 package main
 
-import "fmt"
-
 func main() {
-	s := "abc"
-	for i := 0; i < len(s); i++ {
-		fmt.Printf("%c ", s[i])
+	slice := []int{1, 2, 3, 4, 5}
+
+	for i := 0; i < len(slice); i++ {
+		println(slice[i])
 	}
 }

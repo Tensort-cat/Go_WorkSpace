@@ -3,36 +3,39 @@ package main
 import "fmt"
 
 func longestConsecutive(nums []int) int {
-	res := 0
-	l := len(nums)
-	if l == 0 {
-		return res
-	}
-	m := make(map[int]struct{}, 0)
+
+	set := make(map[int]bool)
 	for _, num := range nums {
-		m[num] = struct{}{}
+		set[num] = true
 	}
 
-	var exists bool
-	for x, _ := range m {
-		if _, exists := m[x-1]; exists {
+	res := 0
+	// 遍历 set 去重后的元素
+	for num := range set {
+		// 不是起点
+		if set[num-1] {
 			continue
 		}
 
-		// x 是序列的起点
-		y := x + 1
-		_, exists = m[y]
-		for exists {
-			y++
-			_, exists = m[y]
+		cur := num
+		length := 1
+
+		for set[cur+1] {
+			cur++
+			length++
 		}
-		res = max(res, y-x)
+		res = max(res, length)
 	}
 
 	return res
 }
 
 func main() {
-	nums := []int{100, 4, 200, 1, 3, 2}
+	var n int
+	fmt.Scan(&n)
+	nums := make([]int, n)
+	for i := 0; i < n; i++ {
+		fmt.Scan(&nums[i])
+	}
 	fmt.Println(longestConsecutive(nums))
 }

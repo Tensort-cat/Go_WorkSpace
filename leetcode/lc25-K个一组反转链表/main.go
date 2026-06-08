@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type ListNode struct {
 	Val  int
 	Next *ListNode
@@ -18,7 +20,7 @@ func reverse(head *ListNode) *ListNode {
 	return prev
 }
 
-func reverseKGroup(head *ListNode, k int) *ListNode {
+func reverseKGroup1(head *ListNode, k int) *ListNode {
 	heads := []*ListNode{}
 	p := head
 	var prev *ListNode
@@ -57,6 +59,62 @@ func reverseKGroup(head *ListNode, k int) *ListNode {
 	return newHeads[0]
 }
 
-func main() {
+func travel(head *ListNode) {
+	p := head
+	for p != nil {
+		fmt.Printf("%d ", p.Val)
+		p = p.Next
+	}
+	fmt.Println()
+}
 
+func reverseKGroup2(head *ListNode, k int) *ListNode {
+	cnt := 0
+	p := head
+	var q *ListNode
+	for p != nil && cnt < k {
+		q = p
+		p = p.Next
+		cnt++
+	}
+	if cnt < k {
+		return head
+	}
+
+	// 反转
+	q.Next = nil // 断链
+	nextHead := reverseKGroup2(p, k)
+	cur := head
+	var prev *ListNode
+	for cur != nil {
+		next := cur.Next
+		cur.Next = prev
+		prev = cur
+		cur = next
+	}
+	head.Next = nextHead
+	return prev
+}
+
+func main() {
+	var n, k int
+	fmt.Scan(&n, &k)
+	head := new(ListNode)
+	p := head
+	var val int
+	for i := 0; i < n-1; i++ {
+		fmt.Scan(&val)
+		p.Val = val
+		p.Next = new(ListNode)
+		p = p.Next
+	}
+	fmt.Scan(&val)
+	p.Val = val
+	p.Next = nil
+
+	travel(head)
+	// newHead := reverseKGroup1(head, k)
+	newHead := reverseKGroup2(head, k)
+
+	travel(newHead)
 }

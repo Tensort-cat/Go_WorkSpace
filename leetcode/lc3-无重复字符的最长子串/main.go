@@ -4,22 +4,20 @@ import "fmt"
 
 func lengthOfLongestSubstring(s string) int {
 	res := 0
-	l := len(s)
-	for i := 0; i < l; i++ {
-		if l-i <= res {
-			break
-		}
-		count := 0
-		m := make(map[byte]struct{})
-		for j := i; j < l; j++ {
-			_, exists := m[s[j]]
-			if exists {
-				break
+
+	left, right := 0, 0
+	hashMap := make(map[byte]int)
+	for left <= right && right < len(s) {
+		if _, exists := hashMap[s[right]]; !exists {
+			hashMap[s[right]] = right
+		} else {
+			for ; left < hashMap[s[right]]+1; left++ {
+				delete(hashMap, s[left])
 			}
-			m[s[j]] = struct{}{}
-			count++
+			hashMap[s[right]] = right
 		}
-		res = max(count, res)
+		res = max(res, right-left+1)
+		right++
 	}
 
 	return res

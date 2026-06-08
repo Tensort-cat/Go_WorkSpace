@@ -9,5 +9,6 @@ type TreeNode struct {
 }
 
 func main() {
+	// 层序数组建二叉树
 	fmt.Println("sss")
 }
